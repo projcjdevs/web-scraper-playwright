@@ -1,0 +1,15 @@
+web-scraper/
+├── app/
+│   ├── __init__.py
+│   ├── main.py              # FastAPI app, lifespan, route
+│   ├── config.py             # Centralized constants
+│   ├── models.py             # Pydantic request/response schemas
+│   └── core/
+│       ├── __init__.py
+│       ├── browser_manager.py  # Persistent browser lifecycle + semaphore
+│       ├── dom_extractor.py    # Deterministic DOM signal extraction
+│       ├── screenshotter.py    # 3-screenshot capture + Pillow optimization
+│       └── analyzer.py         # Orchestrator combining extraction + screenshots
+├── requirements.txt
+├── run.py                    # Uvicorn entrypoint
+└── README.md
