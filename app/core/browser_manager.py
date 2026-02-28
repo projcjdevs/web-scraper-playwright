@@ -22,7 +22,8 @@ class BrowserManager:
         self._semaphore: asyncio.Semaphore = asyncio.Semaphore(max_concurrent_browsers)
         self._audit_count: int = 0
         self._start_time: float = 0.0
-
+        self._active: bool = False
+        self._waiting_count: int = 0
         self._restart_lock: asyncio.Lock = asyncio.Lock() 
 
     async def start(self):
@@ -41,9 +42,7 @@ class BrowserManager:
                 "--no-sandbox",               
                 "--disable-background-timer-throttling",
                 "--disable-backgrounding-occluded-windows",
-                "--disable-renderer-backgrounding",
-                "--disable-ipc-flooding-protection",
-                "--single-process",  
+                "--disable-renderer-backgrounding",  
             ],
         )
         self._audit_count = 0
@@ -67,7 +66,7 @@ class BrowserManager:
                 return
             
             logger.warning(
-                "Restarting browser due to audit count or uptime limits.",
+                "Restarting browser (audits=%d, uptime=%.0fs).", 
                 self._audit_count,
                 time.monotonic() - self._start_time,
             )
@@ -78,9 +77,27 @@ class BrowserManager:
             await self._launch_browser()
 
     async def acquire_context(self):
+        if self._active:
+            self._waiting_count += 1
+            logger.info(
+                "Audit queued — waiting for current audit to finish (%d in queue)",
+                self._waiting_count,
+            )
+
         await self._semaphore.acquire()
+
+        if self._waiting_count > 0:
+            self._waiting_count -= 1
+
+        self._active = True
+
         try:
             await self._maybe_restart()
+
+            if not self._browser or not self._browser.is_connected():
+                logger.warning("Browser found dead on acquire — force relaunching...")
+                await self._launch_browser()
+
             context = await self._browser.new_context(
                 viewport={"width": 1280, "height": 900},
                 java_script_enabled=True,
@@ -92,12 +109,15 @@ class BrowserManager:
                 ),
             )
             return context
-        except Exception as e:
+
+        except Exception:
+            self._active = False
             self._semaphore.release()
             raise
 
     def release_context(self) -> None:
         self._audit_count += 1
+        self._active = False
         self._semaphore.release()
 
     async def stop(self) -> None:

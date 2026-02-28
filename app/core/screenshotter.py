@@ -46,24 +46,36 @@ def _optimize_screenshot(png_bytes: bytes) -> str:
     
 
 async def capture_screenshot(page: Page) -> dict[str, str]:
-        
+
     screenshots = {"hero": "", "mid": "", "footer": ""}
 
     try:
         hero_bytes = await page.screenshot(type="png")
         screenshots["hero"] = _optimize_screenshot(hero_bytes)
 
-        await page.evaluate(f"window.scrollBy(0, {VIEWPORT_HEIGHT})")
-        await page.wait_for_timeout(400)
-        mid_bytes = await page.screenshot(type="png")
-        screenshots["mid"] = _optimize_screenshot(mid_bytes)
+        try:
+            await page.evaluate("window.scrollBy(0, 900)")
+            await page.wait_for_timeout(600)
 
-        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-        await page.wait_for_timeout(400)
-        footer_bytes = await page.screenshot(type="png")
-        screenshots["footer"] = _optimize_screenshot(footer_bytes)
+            await page.evaluate("document.readyState")  
+            mid_bytes = await page.screenshot(type="png")
+            screenshots["mid"] = _optimize_screenshot(mid_bytes)
+
+        except Exception as e:
+            logger.warning("Mid screenshot failed, skipping: %s", e)
+
+        try:
+            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await page.wait_for_timeout(600)
+
+            await page.evaluate("document.readyState") 
+            footer_bytes = await page.screenshot(type="png")
+            screenshots["footer"] = _optimize_screenshot(footer_bytes)
+
+        except Exception as e:
+            logger.warning("Footer screenshot failed, skipping: %s", e)
 
     except Exception as e:
         logger.error("Screenshot capture failed: %s", e)
 
-    return screenshots
+    return screenshots 

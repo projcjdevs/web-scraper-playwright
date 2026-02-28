@@ -1,6 +1,6 @@
 from pydantic import BaseModel, field_validator
 from typing import Optional
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
 
 class AuditRequest(BaseModel):
     url: str
@@ -19,7 +19,28 @@ class AuditRequest(BaseModel):
             raise ValueError(f"invalid URL scheme: {parsed.scheme}")
         if not parsed.netloc:
             raise ValueError("URL must have a valid domain")
-        return v
+        TRACKING_PARAMS = {
+            "gclid", "gbraid", "wbraid", "gad_source", "gad_campaignid",
+            "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+            "fbclid", "msclkid", "mc_eid", "ref", "_ga",
+        }
+
+        existing_params = parse_qs(parsed.query, keep_blank_values=True)
+        cleaned_params = {
+            k: v for k, v in existing_params.items()
+            if k not in TRACKING_PARAMS
+        }
+
+        clean_url = urlunparse((
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            urlencode(cleaned_params, doseq=True),
+            "",
+        ))
+
+        return clean_url
     
 class TechnicalSignals(BaseModel):
     has_ssl: bool = False
