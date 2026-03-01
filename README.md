@@ -12,7 +12,7 @@ An automated website auditing system for digital marketing agencies. Scrapes any
 URL → Headless Browser → Extract Signals + Screenshots → Groq AI → Scores & Recommendations
 ```
 
-![n8n Workflow](C:\Users\Charles\Documents\web-scraper\web-scraper-n8n-workflow.png)
+![n8n Workflow](web-scraper-n8n-workflow.png)
 
 1. You paste a URL into n8n
 2. The scraper opens the site in Chromium, extracts 11 technical signals and 3 screenshots
