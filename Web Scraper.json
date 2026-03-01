@@ -1,0 +1,305 @@
+{
+  "name": "Web Scraper",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        848,
+        128
+      ],
+      "id": "302dff21-c079-4d96-83e5-57674db32908",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "c17f64fd-74c5-4598-8eec-469a9df7134f",
+      "name": "Manual Trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/analyze",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"url\": \"{{ $json.url }}\"\n}",
+        "options": {
+          "timeout": 6000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        384,
+        0
+      ],
+      "id": "0438703c-39f6-4824-8f6b-63a007c9d32a",
+      "name": "HTTP Request to Web Scraper",
+      "retryOnFail": false,
+      "executeOnce": false,
+      "alwaysOutputData": false,
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "92d79748-9b3b-494b-8c90-3007be82ff83",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "success",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        624,
+        0
+      ],
+      "id": "123e13d1-9ef0-4274-b41b-24198a9d34d3",
+      "name": "Audit Success?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"meta-llama/llama-4-scout-17b-16e-instruct\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a website quality auditor for a digital marketing agency. Analyze the provided website data and screenshots. Return a JSON object with these fields:\\n\\n- overall_score (0-100): overall website quality\\n- design_score (0-100): visual design and professionalism\\n- functionality_score (0-100): navigation, CTAs, forms\\n- seo_score (0-100): meta tags, structured data, SSL\\n- mobile_readiness (0-100): viewport meta, responsive indicators\\n- summary (string): 2-3 sentence assessment\\n- top_issues (array of strings): top 3 problems found\\n- recommendation (string): what you'd pitch this business\\n\\nReturn ONLY valid JSON, no markdown, no explanation.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"text\",\n          \"text\": \"Audit this website: {{ $json.resolved_url }}\\n\\nTechnical signals:\\n- SSL: {{ $json.technical.has_ssl }}\\n- Title length: {{ $json.technical.title_length }}\\n- Has meta description: {{ $json.technical.has_meta_description }}\\n- Has viewport meta: {{ $json.technical.has_viewport_meta }}\\n- CTA count: {{ $json.technical.cta_count }}\\n- Has contact form: {{ $json.technical.has_contact_form }}\\n- Has phone number: {{ $json.technical.has_phone_number }}\\n- Has email: {{ $json.technical.has_email }}\\n- Nav items: {{ $json.technical.nav_item_count }}\\n- Structured data: {{ $json.technical.has_structured_data }}\\n- Page load time: {{ $json.performance.page_load_time_ms }}ms\"\n        },\n        {\n          \"type\": \"image_url\",\n          \"image_url\": {\n            \"url\": \"data:image/jpeg;base64,{{ $json.screenshots.hero }}\"\n          }\n        },\n        {\n          \"type\": \"image_url\",\n          \"image_url\": {\n            \"url\": \"data:image/jpeg;base64,{{ $json.screenshots.mid }}\"\n          }\n        },\n        {\n          \"type\": \"image_url\",\n          \"image_url\": {\n            \"url\": \"data:image/jpeg;base64,{{ $json.screenshots.footer }}\"\n          }\n        }\n      ]\n    }\n  ],\n  \"temperature\": 0.3,\n  \"max_tokens\": 1000,\n  \"response_format\": { \"type\": \"json_object\" }\n}",
+        "options": {
+          "timeout": 3000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        848,
+        -64
+      ],
+      "id": "97549efe-54d8-429f-82af-cd3d447cddaf",
+      "name": "Groq Vision Analysis",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "nwxvjTpvqUZY5mBv",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3dab298e-d41d-4235-88ac-7a268fdf4a7d",
+              "name": "audit_result",
+              "value": "={{ $json.choices[0].message.content }}",
+              "type": "object"
+            },
+            {
+              "id": "6f84f80c-66ae-4252-9aab-54cef574307e",
+              "name": "website_url",
+              "value": "={{ $('Set URL').item.json.url }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1104,
+        0
+      ],
+      "id": "1084a3f8-4660-46e9-8038-69e3d9ae5790",
+      "name": "Parse Result"
+    },
+    {
+      "parameters": {
+        "content": "## Extactor\n",
+        "height": 208,
+        "width": 592,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        -48
+      ],
+      "id": "f32e21fe-a65e-4963-aa8b-8103a4f35c27",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "36218af3-6d4d-4580-90a7-dde8d23822ad",
+              "name": "url",
+              "value": "https://www.urbansmiles.com.ph/",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        192,
+        0
+      ],
+      "id": "f5614fb2-e483-4aae-a96c-e54907e5a43c",
+      "name": "Set URL"
+    },
+    {
+      "parameters": {
+        "content": "## Evaluation\n\n",
+        "height": 368,
+        "width": 432,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        576,
+        -96
+      ],
+      "id": "9b80a74b-a169-473d-855e-72dd12ecd9d4",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Results\n\n\n",
+        "height": 272,
+        "width": 288,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        -80
+      ],
+      "id": "8131dd65-1e63-44ab-80c4-930b37de833d",
+      "name": "Sticky Note2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request to Web Scraper": {
+      "main": [
+        [
+          {
+            "node": "Audit Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audit Success?": {
+      "main": [
+        [
+          {
+            "node": "Groq Vision Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Vision Analysis": {
+      "main": [
+        [
+          {
+            "node": "Parse Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set URL": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request to Web Scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "857b9d8e-c7fc-4dd4-96ed-398d19fa9e6f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "715305857ae86e6e233a639d998e90b6dc4ce177710227853f05efc5fbe0fbe2"
+  },
+  "id": "a4Loxl2vxyFCdUOM",
+  "tags": []
+}
